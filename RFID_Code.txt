@@ -1,0 +1,364 @@
+/*
+ * Write personal data of a MIFARE RFID card using a RFID-RC522 reader
+ * Uses MFRC522 - Library to use ARDUINO RFID MODULE KIT 13.56 MHZ WITH TAGS SPI W AND R BY COOQROBOT. 
+ * -----------------------------------------------------------------------------------------
+ *             MFRC522      Arduino       Arduino   Arduino    Arduino          Arduino
+ *             Reader/PCD   Uno/101       Mega      Nano v3    Leonardo/Micro   Pro Micro
+ * Signal      Pin          Pin           Pin       Pin        Pin              Pin
+ * -----------------------------------------------------------------------------------------
+ * RST/Reset   RST          9             5         D9         RESET/ICSP-5     RST
+ * SPI SS      SDA(SS)      10            53        D10        10               10
+ * SPI MOSI    MOSI         11 / ICSP-4   51        D11        ICSP-4           16
+ * SPI MISO    MISO         12 / ICSP-1   50        D12        ICSP-1           14
+ * SPI SCK     SCK          13 / ICSP-3   52        D13        ICSP-3           15
+ *
+ * More pin layouts for other boards can be found here: https://github.com/miguelbalboa/rfid#pin-layout
+ *
+ * Hardware required:
+ * Arduino
+ * PCD (Proximity Coupling Device): NXP MFRC522 Contactless Reader IC
+ * PICC (Proximity Integrated Circuit Card): A card or tag using the ISO 14443A interface, eg Mifare or NTAG203.
+ * The reader can be found on eBay for around 5 dollars. Search for "mf-rc522" on ebay.com. 
+ */
+
+#include <SPI.h>
+#include <MFRC522.h>
+
+#define RST_PIN          9         // Configurable, see typical pin layout above
+#define SS_PIN          10          // Configurable, see typical pin layout above
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+byte stack[900];
+byte top=-1;
+byte array[9]={0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09};
+
+String results[20]={};
+int incre=-1;
+int res=0;
+MFRC522::MIFARE_Key key;
+byte bufferLen = 18;
+
+void setup(){
+Serial.begin(9600);
+  SPI.begin();
+  mfrc522.PCD_Init();
+  Serial.println(F("Write personal data on a MIFARE PICC"));
+  
+  // Prepare the default key - all keys are set to FFFFFFFFFFFFh at chip delivery from the factory
+  for (byte i = 0; i < 6; i++) {
+    key.keyByte[i] = 0xFF;
+  }
+
+
+}
+void add(String str){
+  incre+=1;
+  results[incre]=str;
+  
+}
+// Create MFRC522 instance
+int check(String str){
+  
+  for(int i=0;i<10;i++){
+    if(str.equals(results[i])){
+      res=1;
+      return;
+    }
+  }
+  res=0;
+}
+
+void modify1(byte data){
+  for(int i=0;i<9;i++){
+    
+    if(data==stack[i]){
+      
+      stack[i]=0;
+    }
+  }
+}
+
+void modify2(byte data){
+  if(data==1){
+    array[0]=0x01;
+  }
+  else if(data==2){
+    array[1]=0x02;
+  }
+  else if(data==3){
+    array[2]=0x03;
+  }
+  else if(data==4){
+    array[3]=0x04;
+  }
+  else if(data==5){
+    array[4]=0x05;
+  }
+  else if(data==6){
+    array[5]=0x06;
+  }
+  else if(data==7){
+    array[6]=0x07;
+  }
+  else if(data==8){
+    array[7]=0x08;
+  }
+  else if(data==9){
+    array[8]=0x09;
+  }
+  
+  
+}
+
+void delete_uid(String str1){
+  for(int i=0;i<20;i++){
+    if(String(results[i]).equals(String(str1))){
+      results[i]="";
+      for(int j=i;j<19;j++){
+        results[j]=results[j+1];
+      }
+      incre=incre-1;
+      break;
+    }
+  }
+}
+
+
+
+
+
+
+void remove(byte num1){
+  for(int j=0;j<9;j++){
+    if(array[j]==num1){
+      array[j]=0x63;
+    }
+  }
+
+
+}
+
+
+void push(byte num){
+    top=top+1;
+    stack[top]=num;
+  }
+
+byte pop(){
+    byte num=stack[top];
+    top=top-1;
+    return num;
+    
+
+}
+
+void prints(){
+  Serial.println("The Stack Elements: ");
+  for(int i=0;i<9;i++){
+    Serial.println(stack[i]);
+  }
+}
+
+MFRC522::StatusCode status;
+ 
+
+
+void ReadDataFromBlock(byte blockNum, byte readBlockData[]) {
+  // Authenticating the desired data block for Read access using Key A
+  MFRC522::StatusCode status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockNum, &key, &(mfrc522.uid));
+  
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print("Authentication failed for Read: ");
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+  
+  // Reading data from the Block
+  status = mfrc522.MIFARE_Read(blockNum, readBlockData, &bufferLen);
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print("Reading failed: ");
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+  
+  Serial.println("Block was read successfully");
+
+  Serial.print("Data in Block 4: ");
+  for (int i = 0; i < 1; i++) {
+    Serial.print(readBlockData[i]);
+    Serial.println("");
+    modify1(readBlockData[i]);
+    modify2(readBlockData[i]);
+    prints();
+    print();
+  }
+
+  
+  
+}
+
+void clearBuffer(byte* buffer, size_t bufferSize) {
+  memset(buffer, 0, bufferSize);  // Fill the buffer with zeros
+}
+
+
+void print(){
+  Serial.println("The array elements: ");
+  for(int i=0;i<9;i++){
+    
+    Serial.println(array[i]);
+  }
+}
+
+void loop() {
+
+  // Prepare key - all keys are set to FFFFFFFFFFFFh at chip delivery from the factory.
+ // MFRC522::MIFARE_Key key;
+  for (byte i = 0; i < 6; i++) key.keyByte[i] = 0xFF;
+
+  // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
+  if ( ! mfrc522.PICC_IsNewCardPresent()) {
+    return;
+  }
+  
+
+  // Select one of the cards
+  if ( ! mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
+
+  String ID="";
+
+  //Dump UID
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    //Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
+    //Serial.print(mfrc522.uid.uidByte[i], HEX);
+    ID.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? "0" : " "));
+    ID.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+  ID.toUpperCase();
+  check(ID);
+  
+  if(res==0){
+  
+  add(ID);
+  
+  Serial.print(F(" PICC type: "));   // Dump PICC type
+  MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
+  Serial.println(mfrc522.PICC_GetTypeName(piccType));
+
+  byte buffer[34];
+  byte block;
+ // MFRC522::StatusCode status;
+  byte len;
+  int u=7;
+
+  Serial.setTimeout(20000L) ;
+       // wait until 20 seconds for input from serial
+  // Ask personal data: First name
+  for(int k=0;k<9;k++)
+  {
+    if(array[k]!=0x63)
+    {
+  buffer[0]={array[k]};
+  
+  push(buffer[0]);
+  remove(buffer[0]);
+  prints();
+  print();
+  break;
+  //pop();
+  
+  
+
+    }
+  }
+  
+  
+  
+
+
+  for (byte i = 1; i < 34; i++) buffer[i] = ' ';     // pad with spaces
+
+  
+
+  block = 4;
+  //Serial.println(F("Authenticating using key A..."));
+  status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, block, &key, &(mfrc522.uid));
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print(F("PCD_Authenticate() failed: "));
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+
+  // Write block
+  status = mfrc522.MIFARE_Write(block,buffer, 16);
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print(F("MIFARE_Write() failed: "));
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+  else{ Serial.println(F("MIFARE_Write() success: "));
+        Serial.print("hell");
+  }
+
+  block = 5;
+  //Serial.println(F("Authenticating using key A..."));
+  status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, block, &key, &(mfrc522.uid));
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print(F("PCD_Authenticate() failed: "));
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+
+  // Write block
+  status = mfrc522.MIFARE_Write(block, &buffer[16], 16);
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print(F("MIFARE_Write() failed: "));
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+  else {
+    Serial.println(F("MIFARE_Write() success: "));
+    Serial.print("hell");
+    /*byte val=1;
+  String id=" D3 F109 2E";
+  modify1(val);
+  modify2(val);
+  delete_uid(id);
+
+  prints();
+  print();
+  Serial.println(results[0]);*/
+  }
+
+  
+
+  
+
+  }
+
+  
+  
+
+  
+
+
+  
+  delay(1000);
+
+  byte readBlockData[18];
+  ReadDataFromBlock(4, readBlockData);
+  
+  
+  Serial.println();
+  
+  
+  
+  mfrc522.PICC_HaltA();
+  mfrc522.PCD_StopCrypto1();
+  
+  
+
+}
